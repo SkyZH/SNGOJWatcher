@@ -1,56 +1,103 @@
 import mysql.connector
 import time
 import subprocess
-
-
+import config
+import random
 
 codeConfig = {
-    'basePath': 'E:/SmartJudger/data/prob/',
-    'targetPath': 'E:/SmartJudgerWatcher/data/'
+    'probPath': 'E:/SmartJudger/data/prob/',
+    'execPath': 'E:/SmartJudgerWatcher/data/',
+    'codePath': 'E:/SmartJudgerWatcher/data/'
 }
 
+langCompileConfig = {
+    0: "g++ -x c++ %(src)s -o %(target)s",
+    1: "",
+    2: "",
+    3: "",
+    4: "",
+    5: "",
+    6: "",
+    7: "",
+    8: "",
+    9: "",
+    10: "",
+    11: ""
+}
 
+langRunConfig = {
+    0: "%(target)s",
+    1: "",
+    2: "",
+    3: "",
+    4: "",
+    5: "",
+    6: "",
+    7: "",
+    8: "",
+    9: "",
+    10: "",
+    11: ""
+}
 
-def compile(path, pid, lang, status):
-    cmd = "".join([
-        'g++ -x c++ ',
-        codeConfig['basePath'],
-        path,
-        ' -o ',
-        codeConfig['targetPath'],
-        path,
-        '.exe'
-    ])
+def compile(src, lang, target):
+    cmd = langCompileConfig[lang] % {'src': src, 'target': target}
     print(cmd)
     p = subprocess.Popen(cmd,
     shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    for line in p.stdout.readlines():
-        print (line)
     retval = p.wait()
-    return retval
+    return (retval, p.stdout.read())
+
+def runprog(src, lang, target):
+    return 0
+
+def query(db, sql, cmd, dat):
+    sql.execute(cmd, dat)
+    return sql
+
+def freeQuery(db):
+    db.commit()
+
+def saveCode(sid, pid, lang, code, path):
+    fp = open(path , 'w')
+    fp.write(code)
+    fp.close()
+
+def doTask(db, sql, sid, pid, lang):
+    # set status
+    # result = query("".join(["UPDATE status SET status = 1 WHERE sid = ", str(sid)]))
+    # debug
+    print("Waiting: sid:%s pid:%s lang:%s" % (sid, pid, lang))
+    sql = query(db, sql, "UPDATE status SET status=1 WHERE sid=%s" % (sid), ())
+    # get code
+    print("Getting code: sid:%s pid:%s lang:%s" % (sid, pid, lang))
+    sql = query(db, sql, "SELECT sid, code FROM statuscode WHERE sid = %s" % (sid), ())
+    src_path = "%s/%s_%d.code" % (codeConfig["codePath"], sid, random.randint(0, 65536))
+    out_path = "%s/%s_%d.exe" % (codeConfig["execPath"], sid, random.randint(0, 65536))
+    for (sid, code) in sql:
+        saveCode(sid, pid, lang, code, src_path)
+    out_path = "%s/%s_%d.code" % (codeConfig["codePath"], sid, random.randint(0, 65536))
+    freeQuery(db)
+    print("Compile: sid:%s pid:%s lang:%s" % (sid, pid, lang))
+    (ret_code, ret_dat) = compile(src_path, lang, out_path)
+    if(ret_code != 0):
+        sql = query(db, sql, "UPDATE status SET status=7 WHERE sid=%s" % (sid), ())
+        sql = query(db, sql, "UPDATE statuscode SET ret = %s WHERE sid = %s", (bytes.decode(ret_dat), sid))
+    else:
+        sql = query(db, sql, "UPDATE status SET status=8 WHERE sid=%s" % (sid), ())
 
 def __main__():
-    sql = mysql.connector.connect(**sqlconfig)
+    db = mysql.connector.connect(**config.dbconfig.sqlconfig)
     while True:
-        time.sleep(2);
+        print( "Excuting...")
+        sql = db.cursor()
+        sql = query(db, sql, "SELECT sid, pid, lang, status FROM status WHERE status = 0 LIMIT 0, 1 ", ())
+        for (sid, pid, lang, status) in sql:
+            doTask(db, sql, sid, pid, lang)
+        sql.close()
+        db.commit()
+        time.sleep(2)
 
-        cursor = sql.cursor()
-
-        query = ("SELECT jid, path, pid, lang, status FROM judge WHERE status = 0 LIMIT 0, 1 ")
-        cursor.execute(query)
-        for (jid, path, pid, lang, status) in cursor:
-            query = ("".join(["UPDATE judge SET status = 1 WHERE jid = ", str(jid)]))
-            cursor.execute(query)
-            print("Running {0}".format(path))
-            __status = compile(path, pid, lang, status);
-            if(__status != 0):
-                query = ("".join(["UPDATE judge SET status = 7 WHERE jid = ", str(jid)]))
-            else:
-                query = ("".join(["UPDATE judge SET status = 8 WHERE jid = ", str(jid)]))
-            cursor.execute(query)
-        cursor.close()
-
-
-    sql.close()
+    db.close()
 
 __main__()
