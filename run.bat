@@ -1,1 +1,1 @@
-C:\Python34\python e:/smartjudgerwatcher/__main__.py
+C:\Python34\python e:/smartjudgerwatcher/main.win.py

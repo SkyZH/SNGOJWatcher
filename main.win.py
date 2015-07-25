@@ -7,9 +7,9 @@ import os
 import traceback
 
 codeConfig = {
-    'probPath': 'E:/SmartJudgerWatcher/data/prob/',
-    'execPath': 'E:/SmartJudgerWatcher/data/exec/',
-    'codePath': 'E:/SmartJudgerWatcher/data/code/'
+    'probPath': './data/prob/',
+    'execPath': './data/exec/',
+    'codePath': './data/code/'
 }
 
 langCompileConfig = {
@@ -158,7 +158,7 @@ def __main__():
             print("Task End")
         sql.close()
         db.commit()
-        time.sleep(2)
+        time.sleep(1)
 
     db.close()
 

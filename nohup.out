@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "./main.win.py", line 165, in <module>
+    __main__()
+  File "./main.win.py", line 161, in __main__
+    time.sleep(1)
+KeyboardInterrupt
